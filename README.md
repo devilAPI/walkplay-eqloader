@@ -1,6 +1,163 @@
-# eqloader-flutter
-Already works
+# walkplay-eqloader
 
-Tested on Linux, Android.
+An app for editing parametric EQ and pushing it to Walkplay-based USB DAC dongles (e.g. the Crinear Protocol Micro) without the vendor's app. It also generates EQ from headphone measurements with AutoEQ.
 
-Windows and macOS implementation is still untested
+Runs on Linux, Windows, macOS and Android. This is the Flutter rewrite of the original Python/Tkinter tool, which lives on in the [`legacy-tkinter`](../../tree/legacy-tkinter) branch.
+
+## Download
+
+Get the latest build from [Releases](../../releases):
+
+| Platform | File | Status |
+|---|---|---|
+| Android | `…-android.apk` | Tested |
+| Linux x64 / arm64 | `…-linux-x64.tar.gz`, `…-linux-arm64.tar.gz` | Tested |
+| Windows x64 / arm64 | `…-windows-x64.zip`, `…-windows-arm64.zip` | **Untested** |
+| macOS (Intel + Apple Silicon) | `…-macos-universal.zip` | **Untested** |
+
+`dev-<number>` releases are automatic builds of the latest commit and may be unstable.
+
+Device support on Windows and macOS is new and hasn't been tried on real hardware yet. If it works for you, or doesn't, please [open an issue](../../issues).
+
+## Features
+
+- **Visual EQ editor**: tap/click the graph to add a band, drag a handle to move it. Right-click (mouse) or long-press (touch) a handle to delete it. Values can also be typed in, and several selected bands can be edited at once.
+- **Filter types**: Peaking (PK), Low Shelf (LSQ), High Shelf (HSQ), Low Pass (LP), High Pass (HP). Q can be shown as bandwidth in octaves.
+- **Device**: push the EQ to any PEQ slot, load the current EQ back from the device, and enable/disable PEQ per slot.
+- **Profiles**: save and load the `.txt` format used by EqualizerAPO and eq.hangout.audio.
+- **AutoEQ**: pick a headphone/IEM model from the [AutoEq](https://github.com/jaakkopasanen/AutoEq) database and generate EQ bands plus a clip-safe preamp, or load the profile the AutoEq project already computed for it.
+- **Undo/redo** for all editor changes.
+- **Phone layout**: the graph stays on top and the controls are split into EQ, Device, Files and Log tabs.
+
+## Setup
+
+### Android
+
+Install the APK and connect the dongle over USB-C / OTG. Android asks for permission to access the USB device the first time the app uses it; allow it.
+
+### Windows
+
+Extract the zip and run `eqloader.exe`. No driver is needed; the dongle uses the built-in Windows HID driver.
+
+### macOS
+
+Extract the zip and move `eqloader.app` to Applications. The app isn't signed, so the first time, right-click it and choose **Open** to get past Gatekeeper.
+
+### Linux
+
+Extract the archive and run `eqloader` from the extracted folder.
+
+Raw HID access needs a udev rule, so the app can talk to the dongle without root:
+
+```
+sudo cp linux/99-walkplay-hid.rules /etc/udev/rules.d/
+sudo udevadm control --reload-rules && sudo udevadm trigger
+```
+
+Then replug the dongle. The rule file is [`linux/99-walkplay-hid.rules`](linux/99-walkplay-hid.rules) in this repository.
+
+File dialogs use `zenity` (or `kdialog`), which most desktops already have.
+
+## Usage
+
+Plug in the dongle and click **Refresh List** (F5); it appears in the Device list. Select it to use it for all device actions. With several Walkplay devices, pick the right one or enter its PID.
+
+On phones and small screens, **Push EQ to Device** and **Load EQ from Device** are also in the top bar, so they're reachable from every tab.
+
+
+### Building an EQ
+
+1. Tap the graph to place a band, then drag it, or type exact values in the **Selected Filter** panel. Changes apply immediately.
+2. Pick the filter type in **Type**.
+3. To edit several bands at once, Ctrl-/Shift-click them in the **Filters** list (long-press on touch); a changed field applies to all selected bands.
+4. Set **Slot**, **Preamp** and **Buffer** and click **Push EQ to Device**. You're asked to confirm before the slot is overwritten.
+
+### Preamp and buffer
+
+The Protocol Micro always attenuates its output by a fixed 5 dB, set as **Buffer** (default `-5`). The device only stores the preamp beyond that, in whole dB: a preamp of −4.4 dB needs no extra attenuation, −9.6 dB is stored as 5 dB extra. **Load EQ from Device** reports the resulting preamp (stored value + buffer), so an exact preamp only survives through a saved profile file. If your device has no such buffer, set **Buffer** to `0`.
+
+### Max filters
+
+**Max filters** (default `8`) is the number of PEQ bands the device stores. Pushes are padded with inert 0 dB bands, because otherwise the device fills unused slots with copies of the last band. If the EQ has more bands than this, you're warned first: the device would silently drop the extras.
+
+### AutoEQ
+
+1. Click **Compute AutoEQ** (Ctrl+Shift+A).
+2. The first time, choose **Download Online Database** (the AutoEq measurements on GitHub) or **Choose Local Folder...** with measurement `.txt`/`.csv` files. The choice is remembered.
+3. Search for your model and select it. The same model often has measurements from several sources, shown in brackets. Downloads are cached. **Browse File Instead...** uses a single local file, **Change Database...** switches the source.
+4. Pick a target: flat, a target from AutoEq's library (Harman, diffuse field, ...), or your own target file.
+5. The generated bands and preamp replace the current EQ. Review them, then push.
+
+> **Note:** Computing AutoEQ yourself is an experimental feature. It works, but results can differ from what autoeq.app or hangout.audio produce for the same measurement. For a well-tested result, use **Load Pre-computed AutoEQ** instead.
+
+**Load Pre-computed AutoEQ** (Ctrl+Shift+L) skips the optimizer: pick a model from the online database the same way, and it loads the `ParametricEQ.txt` the AutoEq project computed for that measurement. If there are several (one per target), you pick one. This only works for models from the online database.
+
+The AutoEQ database is fetched from GitHub, so AutoEQ needs an internet connection; everything else works offline.
+
+### Profiles and backups
+
+- **Load Profile from File** loads a `.txt` profile. OFF bands, zero-gain bands and duplicate bands are dropped.
+- **Save Profile to File** saves the current EQ and preamp.
+- To back up the device, use **Load EQ from Device**, then **Save Profile to File**.
+
+### Enabling / disabling the EQ
+
+**PEQ Enable / Disable** switches the device EQ on or off for a slot without changing what's stored, e.g. for A/B comparisons. Not all devices support this.
+
+### Keyboard shortcuts
+
+Shortcuts are also shown when hovering over a button.
+
+| Shortcut | Action |
+|---|---|
+| Ctrl+Z | Undo |
+| Ctrl+Y / Ctrl+Shift+Z | Redo |
+| Ctrl+B | Add Band |
+| Ctrl+D | Delete Band |
+| Ctrl+Shift+D | Delete All |
+| Ctrl+E | Load EQ from Device |
+| Ctrl+S | Save Profile to File |
+| Ctrl+O | Load Profile from File |
+| Ctrl+Shift+A | Compute AutoEQ |
+| Ctrl+Shift+L | Load Pre-computed AutoEQ |
+| Ctrl+P | Push EQ to Device |
+| F5 | Refresh List |
+| Ctrl+G | Get Slot / Version |
+| Ctrl+Shift+E | Enable PEQ |
+| Ctrl+Shift+X | Disable PEQ |
+
+## Profile format
+
+The EqualizerAPO / eq.hangout.audio `.txt` format. Decimal commas and points both work.
+
+```
+Preamp: -6,0 dB
+Filter 1: ON PK Fc 1000,0 Hz Gain 3,5 dB Q 1,000
+Filter 2: ON LS Fc 80,0 Hz Gain -2,0 dB Q 0,707
+Filter 3: OFF PK Fc 100,0 Hz Gain 0,0 dB Q 1,000
+```
+
+Filter types: `PK`, `LS`/`LSC`/`LSQ`, `HS`/`HSC`/`HSQ`, `LP`, `HP`. OFF bands and peaking/shelf bands with 0 dB gain are treated as disabled.
+
+## Supported hardware
+
+Walkplay-vendor HID devices (VID `0x3302`). Tested on the **Crinear Protocol Micro** (PID `0xC20F`). Other Walkplay dongles may work; please open an issue if yours behaves differently.
+
+## Command line
+
+The Flutter app has no CLI yet. For pushing and pulling profiles from scripts, use `eqloader.py` from the [`legacy-tkinter`](../../tree/legacy-tkinter) branch.
+
+## Building from source
+
+Needs the [Flutter SDK](https://docs.flutter.dev/get-started/install) (stable channel).
+
+```
+flutter pub get
+flutter test
+flutter run                      # run on this machine
+flutter build apk --release      # or: linux, windows, macos
+```
+
+Each desktop platform has to be built on that platform. Linux builds need `clang cmake ninja-build pkg-config libgtk-3-dev`.
+
+Every push to `flutter-rewrite` builds all platforms and publishes a `dev-<commit number>` pre-release; see [`.github/workflows/dev-release.yml`](.github/workflows/dev-release.yml).
