@@ -14,9 +14,9 @@ Or get the latest build from [Releases](../../releases):
 |---|---|---|
 | Android | `…-android.apk` | Tested |
 | Linux x64 / arm64 | `…-linux-x64.tar.gz` | Tested |
-| Linux arm64 | `…-linux-arm64.tar.gz` | Tested |
+| Linux arm64 | `…-linux-arm64.tar.gz` | **Untested** |
 | Windows x64 | `…-windows-x64.zip` | Tested |
-| Windows arm64 | `…-windows-arm64.zip` | Untested |
+| Windows arm64 | `…-windows-arm64.zip` | **Untested** |
 | macOS (Intel + Apple Silicon) | `…-macos-universal.zip` | **Untested** |
 
 `dev-<number>` releases are automatic builds of the latest commit and may be unstable.
