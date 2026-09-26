@@ -6,7 +6,7 @@ Runs on Linux, Windows, macOS, Android and in the browser. This is the Flutter r
 
 ## Download
 
-**In the browser, no install:** [devilapi.github.io/walkplay-eqloader](https://devilapi.github.io/walkplay-eqloader/) (Chrome, Edge or Opera on a desktop computer; see [Browser](#browser)).
+**In the browser, no install:** [devilapi.github.io/walkplay-eqloader](https://devilapi.github.io/walkplay-eqloader/) (Chrome, Edge or Opera on a desktop computer; see [Browser](#browser)). The [dev preview](https://devilapi.github.io/walkplay-eqloader/preview/) runs the latest commit.
 
 Or get the latest build from [Releases](../../releases):
 
@@ -174,4 +174,4 @@ flutter build apk --release      # or: linux, windows, macos, web
 
 Each desktop platform has to be built on that platform. Linux builds need `clang cmake ninja-build pkg-config libgtk-3-dev`.
 
-Releases are published by running the **Release** workflow by hand (Actions → Release → Run workflow); it builds every platform and tags the next `v1.<number>` ([`release.yml`](.github/workflows/release.yml)). Every push to `flutter-rewrite` builds all platforms and publishes a `dev-<commit number>` pre-release ([`dev-release.yml`](.github/workflows/dev-release.yml)), and deploys the web app to GitHub Pages ([`pages.yml`](.github/workflows/pages.yml)).
+Releases are published by running the **Release** workflow by hand (Actions → Release → Run workflow); it builds every platform, tags the next `v1.<number>` and updates the web app ([`release.yml`](.github/workflows/release.yml)). Every push to `flutter-rewrite` builds all platforms and publishes a `dev-<commit number>` pre-release ([`dev-release.yml`](.github/workflows/dev-release.yml)), and the web app to the [dev preview](https://devilapi.github.io/walkplay-eqloader/preview/) ([`preview.yml`](.github/workflows/preview.yml)). Both sites are served by GitHub Pages from the `gh-pages` branch.

@@ -1,0 +1,31 @@
+name: Web preview
+
+# Every push to flutter-rewrite publishes the web app to the dev preview at
+# https://<owner>.github.io/<repo>/preview/. The main site is only updated
+# by release.yml.
+on:
+  push:
+    branches: [flutter-rewrite]
+
+permissions:
+  contents: write # push to the gh-pages branch
+
+jobs:
+  preview:
+    runs-on: ubuntu-latest
+    # Serialize with release.yml's deploy: both rewrite gh-pages.
+    concurrency:
+      group: gh-pages
+      cancel-in-progress: false
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+      - run: flutter pub get
+      - run: flutter build web --release --base-href "/${{ github.event.repository.name }}/preview/"
+      - name: Publish to gh-pages (preview/)
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: .github/scripts/publish-pages.sh build/web preview

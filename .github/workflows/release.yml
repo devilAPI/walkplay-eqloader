@@ -2,7 +2,8 @@ name: Release
 
 # Manually triggered (Actions tab → Release → Run workflow): builds every
 # platform and publishes a normal release v1.<N>, where N counts up from the
-# highest existing v1.* tag (v1.1, v1.2, ...).
+# highest existing v1.* tag (v1.1, v1.2, ...), then publishes the web app to
+# the main site.
 on:
   workflow_dispatch:
     inputs:
@@ -69,3 +70,24 @@ jobs:
           [ -n "$PREVIOUS" ] && args+=(--notes-start-tag "$PREVIOUS")
           [ -n "$NOTES" ] && args+=(--notes "$NOTES")
           gh release create "$TAG" dist/* "${args[@]}"
+
+  # Publish the web app to the main site once the release is out.
+  web:
+    needs: release
+    runs-on: ubuntu-latest
+    # Serialize with preview.yml: both rewrite gh-pages.
+    concurrency:
+      group: gh-pages
+      cancel-in-progress: false
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+      - run: flutter pub get
+      - run: flutter build web --release --base-href "/${{ github.event.repository.name }}/"
+      - name: Publish to gh-pages (site root, keeps preview/)
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: .github/scripts/publish-pages.sh build/web
