@@ -1,0 +1,8 @@
+{
+  "permissions": {
+    "allow": [
+      "Read(//home/devlapi/.gradle/wrapper/dists/**)",
+      "Read(//home/devlapi/.gradle/wrapper/dists/gradle-9.8.0-all/**)"
+    ]
+  }
+}

@@ -1,0 +1,8 @@
+# Give the logged-in user access to Walkplay-based USB DAC dongles (vendor
+# 0x3302) through hidraw, so the app can talk to them without root.
+#
+#   sudo cp linux/99-walkplay-hid.rules /etc/udev/rules.d/
+#   sudo udevadm control --reload-rules && sudo udevadm trigger
+#
+# then replug the dongle.
+KERNEL=="hidraw*", ATTRS{idVendor}=="3302", MODE="0660", TAG+="uaccess"
