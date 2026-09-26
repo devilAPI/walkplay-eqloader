@@ -1,7 +1,7 @@
 name: Dev release
 
-# Every push to flutter-rewrite builds the APK and publishes it as a
-# pre-release named dev-<commit count>.
+# Every push to flutter-rewrite builds Android, Linux, Windows and macOS
+# binaries and publishes them as a pre-release named dev-<commit count>.
 on:
   push:
     branches: [flutter-rewrite]
@@ -14,44 +14,116 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  apk:
+  version:
     runs-on: ubuntu-latest
+    outputs:
+      count: ${{ steps.count.outputs.count }}
+      tag: dev-${{ steps.count.outputs.count }}
     steps:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0 # full history for the commit count
+      - id: count
+        run: echo "count=$(git rev-list --count HEAD)" >> "$GITHUB_OUTPUT"
 
+  android:
+    needs: version
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
       - uses: actions/setup-java@v4
         with:
           distribution: temurin
           java-version: '17'
-
       - uses: subosito/flutter-action@v2
         with:
           channel: stable
           cache: true
+      - run: flutter pub get
+      - run: flutter test
+      - run: flutter build apk --release --build-number=${{ needs.version.outputs.count }}
+      - run: cp build/app/outputs/flutter-apk/app-release.apk eqloader-${{ needs.version.outputs.tag }}-android.apk
+      - uses: actions/upload-artifact@v4
+        with:
+          name: android
+          path: eqloader-*.apk
 
-      - name: Version
-        id: version
-        run: echo "count=$(git rev-list --count HEAD)" >> "$GITHUB_OUTPUT"
+  desktop:
+    needs: version
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { os: linux, arch: x64, runner: ubuntu-latest }
+          - { os: linux, arch: arm64, runner: ubuntu-24.04-arm }
+          - { os: windows, arch: x64, runner: windows-latest }
+          - { os: windows, arch: arm64, runner: windows-11-arm }
+          # One universal (x64 + arm64) app; Flutter builds macOS universal.
+          - { os: macos, arch: universal, runner: macos-latest }
+    runs-on: ${{ matrix.runner }}
+    env:
+      NAME: eqloader-${{ needs.version.outputs.tag }}-${{ matrix.os }}-${{ matrix.arch }}
+    steps:
+      - uses: actions/checkout@v4
+
+      # flutter-action only ships x64 SDKs for Linux/Windows; use git on arm64.
+      - if: matrix.arch != 'arm64'
+        uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+      - if: matrix.arch == 'arm64'
+        shell: bash
+        run: |
+          git clone --depth 1 -b stable https://github.com/flutter/flutter.git "$RUNNER_TEMP/flutter"
+          echo "$RUNNER_TEMP/flutter/bin" >> "$GITHUB_PATH"
+
+      - if: matrix.os == 'linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y clang cmake ninja-build pkg-config libgtk-3-dev liblzma-dev
 
       - run: flutter pub get
+      - run: flutter build ${{ matrix.os }} --release --build-number=${{ needs.version.outputs.count }}
 
-      - run: flutter test
+      - name: Package (Linux)
+        if: matrix.os == 'linux'
+        run: tar -czf "$NAME.tar.gz" -C build/linux/${{ matrix.arch }}/release/bundle .
+      - name: Package (Windows)
+        if: matrix.os == 'windows'
+        shell: pwsh
+        run: Compress-Archive -Path "build/windows/${{ matrix.arch }}/runner/Release/*" -DestinationPath "$env:NAME.zip"
+      - name: Package (macOS)
+        if: matrix.os == 'macos'
+        run: |
+          app=$(find build/macos/Build/Products/Release -maxdepth 1 -name '*.app' | head -1)
+          ditto -c -k --keepParent "$app" "$NAME.zip"
 
-      - name: Build APK
-        run: >
-          flutter build apk --release
-          --build-number=${{ steps.version.outputs.count }}
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.os }}-${{ matrix.arch }}
+          path: |
+            eqloader-*.tar.gz
+            eqloader-*.zip
 
+  # Publishes whatever built, as long as the Android build (which also runs
+  # the tests) succeeded; a failing desktop target doesn't block the release.
+  release:
+    needs: [version, android, desktop]
+    if: ${{ !cancelled() && needs.android.result == 'success' }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: dist
+          merge-multiple: true
       - name: Publish release
         env:
           GH_TOKEN: ${{ github.token }}
-          TAG: dev-${{ steps.version.outputs.count }}
+          TAG: ${{ needs.version.outputs.tag }}
         run: |
-          apk="eqloader-$TAG.apk"
-          cp build/app/outputs/flutter-apk/app-release.apk "$apk"
-          gh release create "$TAG" "$apk" \
+          gh release create "$TAG" dist/* \
+            --repo "$GITHUB_REPOSITORY" \
             --prerelease \
             --target "$GITHUB_SHA" \
             --title "$TAG" \
