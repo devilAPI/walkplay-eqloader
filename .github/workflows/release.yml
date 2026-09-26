@@ -1,0 +1,71 @@
+name: Release
+
+# Manually triggered (Actions tab → Release → Run workflow): builds every
+# platform and publishes a normal release v1.<N>, where N counts up from the
+# highest existing v1.* tag (v1.1, v1.2, ...).
+on:
+  workflow_dispatch:
+    inputs:
+      notes:
+        description: Release notes (optional; the changes since the last release are listed automatically)
+        required: false
+        type: string
+
+permissions:
+  contents: write
+
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+jobs:
+  version:
+    runs-on: ubuntu-latest
+    outputs:
+      tag: ${{ steps.next.outputs.tag }}
+      version: ${{ steps.next.outputs.version }}
+      previous: ${{ steps.next.outputs.previous }}
+      count: ${{ steps.next.outputs.count }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # tags and full history
+      - id: next
+        run: |
+          last=$(git tag --list 'v1.*' | grep -E '^v1\.[0-9]+$' | sed 's/^v1\.//' | sort -n | tail -1)
+          n=$(( ${last:-0} + 1 ))
+          echo "version=1.$n" >> "$GITHUB_OUTPUT"
+          echo "tag=v1.$n" >> "$GITHUB_OUTPUT"
+          echo "previous=${last:+v1.$last}" >> "$GITHUB_OUTPUT"
+          echo "count=$(git rev-list --count HEAD)" >> "$GITHUB_OUTPUT"
+          echo "Next release: v1.$n"
+
+  build:
+    needs: version
+    uses: ./.github/workflows/build.yml
+    with:
+      name: ${{ needs.version.outputs.tag }}
+      # Flutter wants x.y.z; the app shows 1.N.0.
+      build-name: ${{ needs.version.outputs.version }}.0
+      build-number: ${{ needs.version.outputs.count }}
+
+  # A real release needs every platform, so any failed build stops it.
+  release:
+    needs: [version, build]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: dist
+          merge-multiple: true
+      - name: Publish release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ needs.version.outputs.tag }}
+          PREVIOUS: ${{ needs.version.outputs.previous }}
+          NOTES: ${{ inputs.notes }}
+        run: |
+          args=(--repo "$GITHUB_REPOSITORY" --target "$GITHUB_SHA" --title "$TAG" --latest --generate-notes)
+          [ -n "$PREVIOUS" ] && args+=(--notes-start-tag "$PREVIOUS")
+          [ -n "$NOTES" ] && args+=(--notes "$NOTES")
+          gh release create "$TAG" dist/* "${args[@]}"

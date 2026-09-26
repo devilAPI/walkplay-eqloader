@@ -19,7 +19,7 @@ Or get the latest build from [Releases](../../releases):
 | Windows arm64 | `…-windows-arm64.zip` | **Untested** |
 | macOS (Intel + Apple Silicon) | `…-macos-universal.zip` | **Untested** |
 
-`dev-<number>` releases are automatic builds of the latest commit and may be unstable.
+`v1.<number>` releases (v1.1, v1.2, ...) are the regular releases. `dev-<number>` pre-releases are automatic builds of the latest commit and may be unstable.
 
 Device support on Windows, macOS and in the browser is new and hasn't been tried on real hardware yet. If it works for you, or doesn't, please [open an issue](../../issues).
 
@@ -174,4 +174,4 @@ flutter build apk --release      # or: linux, windows, macos, web
 
 Each desktop platform has to be built on that platform. Linux builds need `clang cmake ninja-build pkg-config libgtk-3-dev`.
 
-Every push to `flutter-rewrite` builds all platforms and publishes a `dev-<commit number>` pre-release ([`dev-release.yml`](.github/workflows/dev-release.yml)), and deploys the web app to GitHub Pages ([`pages.yml`](.github/workflows/pages.yml)).
+Releases are published by running the **Release** workflow by hand (Actions → Release → Run workflow); it builds every platform and tags the next `v1.<number>` ([`release.yml`](.github/workflows/release.yml)). Every push to `flutter-rewrite` builds all platforms and publishes a `dev-<commit number>` pre-release ([`dev-release.yml`](.github/workflows/dev-release.yml)), and deploys the web app to GitHub Pages ([`pages.yml`](.github/workflows/pages.yml)).
