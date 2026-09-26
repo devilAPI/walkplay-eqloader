@@ -1,11 +1,10 @@
 name: Dev release
 
-# Every push to main builds the APK and publishes it as a pre-release
-# named dev-<commit count>. Run it manually for any other branch.
+# Every push to flutter-rewrite builds the APK and publishes it as a
+# pre-release named dev-<commit count>.
 on:
-  push: 
-    branches: [main]
-  workflow_dispatch:
+  push:
+    branches: [flutter-rewrite]
 
 permissions:
   contents: write
