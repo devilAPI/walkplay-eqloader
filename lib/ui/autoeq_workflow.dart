@@ -1,5 +1,4 @@
-import 'dart:isolate';
-
+import 'package:flutter/foundation.dart' show compute;
 import 'package:flutter/material.dart';
 import 'package:path/path.dart' as p;
 
@@ -243,7 +242,8 @@ class AutoEqWorkflow {
           '.txt/.csv files?',
       [
         ('Download Online Database', 'online', ButtonKind.accent),
-        ('Choose Local Folder...', 'local', ButtonKind.normal),
+        if (supportsLocalDatabase)
+          ('Choose Local Folder...', 'local', ButtonKind.normal),
         ('Cancel', null, ButtonKind.normal),
       ],
     );
@@ -317,9 +317,12 @@ class AutoEqWorkflow {
   }
 }
 
-/// Top-level so the isolate closure captures nothing but its arguments.
+/// Runs in a background isolate; on the web (no isolates) on the UI thread.
 Future<AutoEqResult> _computeInIsolate(
   List<Point> measurement,
   List<Point>? target,
   int maxFilters,
-) => Isolate.run(() => autoeqCompute(measurement, target, maxFilters));
+) => compute(_computeEntry, (measurement, target, maxFilters));
+
+AutoEqResult _computeEntry((List<Point>, List<Point>?, int) args) =>
+    autoeqCompute(args.$1, args.$2, args.$3);

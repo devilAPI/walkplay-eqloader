@@ -287,6 +287,12 @@ class _HomePageState extends State<HomePage> implements TaskHost {
     });
   }
 
+  /// Browsers: let the user pick the dongle, which grants access to it.
+  Future<void> _connectDevice() async {
+    await runTask(() => _backend.requestAccess(walkplayVendorId));
+    await _refreshDevices();
+  }
+
   void _selectDevice(HidDeviceInfo d) {
     setState(() => _selectedDevice = d);
     _vid.text = '0x${hex4(d.vendorId)}';
@@ -302,7 +308,7 @@ class _HomePageState extends State<HomePage> implements TaskHost {
       throw StateError(
         'No HID device found with vendor id 0x${hex4(vid)}'
         '${pid != null ? ' and product id 0x${hex4(pid)}' : ''}. '
-        'Refresh the device list, or set VID/PID manually.',
+        '${_backend.needsAccessRequest ? 'Click Connect Device to choose it' : 'Refresh the device list, or set VID/PID manually'}.',
       );
     }
     if (candidates.length > 1 && pid == null) {
@@ -1240,7 +1246,10 @@ class _HomePageState extends State<HomePage> implements TaskHost {
     } else if (_devices.isEmpty) {
       list = Center(
         child: Text(
-          _backend.unavailableReason ?? '(no Walkplay-vendor devices found)',
+          _backend.unavailableReason ??
+              (_backend.needsAccessRequest
+                  ? '(click Connect Device to choose your dongle)'
+                  : '(no Walkplay-vendor devices found)'),
           style: const TextStyle(color: Palette.muted),
           textAlign: TextAlign.center,
         ),
@@ -1292,6 +1301,14 @@ class _HomePageState extends State<HomePage> implements TaskHost {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
+                    if (_backend.needsAccessRequest) ...[
+                      FilledButton(
+                        style: styleFor(ButtonKind.accent),
+                        onPressed: _connectDevice,
+                        child: const Text('Connect Device'),
+                      ),
+                      const SizedBox(height: 4),
+                    ],
                     Tooltip(
                       message: 'F5',
                       child: FilledButton(

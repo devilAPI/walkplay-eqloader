@@ -1,15 +1,14 @@
 /// Platform-neutral HID access: Linux uses /dev/hidraw*, Android the USB
 /// host API through a platform channel, Windows the HID class driver and
-/// macOS IOKit (both through dart:ffi).
+/// macOS IOKit (both through dart:ffi), browsers WebHID.
 library;
 
-import 'dart:io';
 import 'dart:typed_data';
 
-import 'android_usb_hid.dart';
-import 'linux_hidraw.dart';
-import 'macos_hid.dart';
-import 'windows_hid.dart';
+// dart:ffi doesn't exist on the web, so the backends are picked per target.
+import 'backends_native.dart'
+    if (dart.library.js_interop) 'backends_web.dart'
+    as backends;
 
 class HidDeviceInfo {
   final int vendorId;
@@ -49,16 +48,17 @@ abstract class HidBackend {
 
   Future<HidConnection> open(HidDeviceInfo device);
 
-  static HidBackend create() {
-    if (Platform.isAndroid) return AndroidUsbHid();
-    if (Platform.isLinux) return LinuxHidraw();
-    if (Platform.isWindows) return WindowsHid();
-    if (Platform.isMacOS) return MacosHid();
-    return _UnsupportedHid();
-  }
+  /// True when devices only show up after [requestAccess] (browsers).
+  bool get needsAccessRequest => false;
+
+  /// Let the user grant access to a device with [vendorId]. Browsers only
+  /// allow this from a user gesture, e.g. a button press.
+  Future<void> requestAccess(int vendorId) async {}
+
+  static HidBackend create() => backends.createBackend();
 }
 
-class _UnsupportedHid extends HidBackend {
+class UnsupportedHid extends HidBackend {
   @override
   String get unavailableReason =>
       'USB HID access is not implemented on this platform.';

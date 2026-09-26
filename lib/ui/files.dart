@@ -1,8 +1,7 @@
 import 'dart:convert';
-import 'dart:io';
-import 'dart:typed_data';
 
 import 'package:file_picker/file_picker.dart';
+import 'package:flutter/foundation.dart';
 
 /// A text file the user picked: its name/path and decoded contents.
 class PickedText {
@@ -17,10 +16,11 @@ String decodeText(List<int> bytes) => utf8.decode(bytes, allowMalformed: true);
 Future<PickedText?> pickTextFile(String title, List<String> extensions) async {
   // Android's picker filters by MIME type, which .txt/.csv exports often
   // don't carry reliably, so it shows everything there.
+  final android = !kIsWeb && defaultTargetPlatform == TargetPlatform.android;
   final file = await FilePicker.pickFile(
     dialogTitle: title,
-    type: Platform.isAndroid ? FileType.any : FileType.custom,
-    allowedExtensions: Platform.isAndroid ? null : extensions,
+    type: android ? FileType.any : FileType.custom,
+    allowedExtensions: android ? null : extensions,
   );
   if (file == null) return null;
   final bytes = await file.xFile.readAsBytes();
@@ -41,6 +41,8 @@ Future<String?> saveTextFile(
     allowedExtensions: const ['txt'],
     bytes: Uint8List.fromList(utf8.encode(content)),
   );
+  // The web version downloads the file and reports nothing back.
+  if (kIsWeb) return 'your downloads ($fileName)';
   if (uri == null) return null;
   return uri.scheme == 'file'
       ? uri.toFilePath()

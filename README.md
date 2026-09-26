@@ -2,11 +2,13 @@
 
 An app for editing parametric EQ and pushing it to Walkplay-based USB DAC dongles (e.g. the Crinear Protocol Micro) without the vendor's app. It also generates EQ from headphone measurements with AutoEQ.
 
-Runs on Linux, Windows, macOS and Android. This is the Flutter rewrite of the original Python/Tkinter tool, which lives on in the [`legacy-tkinter`](../../tree/legacy-tkinter) branch.
+Runs on Linux, Windows, macOS, Android and in the browser. This is the Flutter rewrite of the original Python/Tkinter tool, which lives on in the [`legacy-tkinter`](../../tree/legacy-tkinter) branch.
 
 ## Download
 
-Get the latest build from [Releases](../../releases):
+**In the browser, no install:** [devilapi.github.io/walkplay-eqloader](https://devilapi.github.io/walkplay-eqloader/) (Chrome, Edge or Opera on a desktop computer; see [Browser](#browser)).
+
+Or get the latest build from [Releases](../../releases):
 
 | Platform | File | Status |
 |---|---|---|
@@ -17,7 +19,7 @@ Get the latest build from [Releases](../../releases):
 
 `dev-<number>` releases are automatic builds of the latest commit and may be unstable.
 
-Device support on Windows and macOS is new and hasn't been tried on real hardware yet. If it works for you, or doesn't, please [open an issue](../../issues).
+Device support on Windows, macOS and in the browser is new and hasn't been tried on real hardware yet. If it works for you, or doesn't, please [open an issue](../../issues).
 
 ## Features
 
@@ -30,6 +32,16 @@ Device support on Windows and macOS is new and hasn't been tried on real hardwar
 - **Phone layout**: the graph stays on top and the controls are split into EQ, Device, Files and Log tabs.
 
 ## Setup
+
+### Browser
+
+Open the [web app](https://devilapi.github.io/walkplay-eqloader/) in Chrome, Edge or Opera on a desktop computer. It talks to the dongle through [WebHID](https://developer.mozilla.org/en-US/docs/Web/API/WebHID_API), which Firefox, Safari and mobile browsers don't support; use the Android app on phones.
+
+Plug in the dongle, open the **Device** section and click **Connect Device**, then pick the dongle in the browser's prompt. The browser remembers the permission, so on later visits the dongle shows up after **Refresh List**.
+
+On Linux, the browser needs the same udev rule as the Linux app (see [Linux](#linux)).
+
+Differences from the installed app: AutoEQ can only use the online database (no local folder), downloaded measurements aren't cached between visits, and saved profiles go to your downloads folder.
 
 ### Android
 
@@ -60,7 +72,7 @@ File dialogs use `zenity` (or `kdialog`), which most desktops already have.
 
 ## Usage
 
-Plug in the dongle and click **Refresh List** (F5); it appears in the Device list. Select it to use it for all device actions. With several Walkplay devices, pick the right one or enter its PID.
+Plug in the dongle and click **Refresh List** (F5); it appears in the Device list. In the browser, click **Connect Device** first. Select it to use it for all device actions. With several Walkplay devices, pick the right one or enter its PID.
 
 On phones and small screens, **Push EQ to Device** and **Load EQ from Device** are also in the top bar, so they're reachable from every tab.
 
@@ -155,9 +167,9 @@ Needs the [Flutter SDK](https://docs.flutter.dev/get-started/install) (stable ch
 flutter pub get
 flutter test
 flutter run                      # run on this machine
-flutter build apk --release      # or: linux, windows, macos
+flutter build apk --release      # or: linux, windows, macos, web
 ```
 
 Each desktop platform has to be built on that platform. Linux builds need `clang cmake ninja-build pkg-config libgtk-3-dev`.
 
-Every push to `flutter-rewrite` builds all platforms and publishes a `dev-<commit number>` pre-release; see [`.github/workflows/dev-release.yml`](.github/workflows/dev-release.yml).
+Every push to `flutter-rewrite` builds all platforms and publishes a `dev-<commit number>` pre-release ([`dev-release.yml`](.github/workflows/dev-release.yml)), and deploys the web app to GitHub Pages ([`pages.yml`](.github/workflows/pages.yml)).

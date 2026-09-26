@@ -5,10 +5,14 @@
 library;
 
 import 'dart:convert';
-import 'dart:io';
 
 import 'package:path/path.dart' as p;
-import 'package:path_provider/path_provider.dart';
+
+// Disk and dart:io on native, browser storage and fetch() on the web.
+import 'autoeq_io.dart' if (dart.library.js_interop) 'autoeq_io_web.dart' as io;
+
+/// Whether a local folder of measurements can be used as the database.
+const supportsLocalDatabase = io.supportsLocalDatabase;
 
 class DbEntry {
   final String label;
@@ -34,32 +38,17 @@ const _skipSuffixes = ['parametriceq', 'graphiceq', 'fixedbandeq', ' eq'];
 
 typedef Logger = void Function(String line);
 
-Future<File> _configFile() async => File(
-  p.join((await getApplicationSupportDirectory()).path, 'autoeq_db.json'),
-);
-
-Future<Directory> _cacheDir() async =>
-    Directory(p.join((await getApplicationCacheDirectory()).path, 'autoeq_db'));
-
 /// The last-used measurement source ('online' or a folder path).
 Future<String?> loadDbSource() async {
-  try {
-    final path = jsonDecode(await (await _configFile()).readAsString())['path'];
-    if (path == 'online' ||
-        (path is String && path.isNotEmpty && Directory(path).existsSync())) {
-      return path as String;
-    }
-  } catch (_) {}
+  final path = await io.readDbSetting();
+  if (path == 'online' ||
+      (path != null && path.isNotEmpty && io.localFolderExists(path))) {
+    return path;
+  }
   return null;
 }
 
-Future<void> saveDbSource(String source) async {
-  try {
-    final f = await _configFile();
-    await f.parent.create(recursive: true);
-    await f.writeAsString(jsonEncode({'path': source}));
-  } catch (_) {}
-}
+Future<void> saveDbSource(String source) => io.writeDbSetting(source);
 
 List<DbEntry> _sorted(Iterable<DbEntry> entries) =>
     entries.toList()
@@ -69,43 +58,20 @@ List<DbEntry> _sorted(Iterable<DbEntry> entries) =>
 /// (the file name); the containing folder becomes the subtitle.
 Future<List<DbEntry>> buildLocalIndex(String root) async {
   final entries = <DbEntry>[];
-  await for (final e in Directory(
-    root,
-  ).list(recursive: true, followLinks: false)) {
-    if (e is! File) continue;
-    final ext = p.extension(e.path).toLowerCase();
+  await for (final path in io.listFilesRecursive(root)) {
+    final ext = p.extension(path).toLowerCase();
     if (ext != '.txt' && ext != '.csv') continue;
-    final stem = p.basenameWithoutExtension(e.path);
+    final stem = p.basenameWithoutExtension(path);
     if (_skipSuffixes.any(stem.toLowerCase().endsWith)) continue;
     entries.add(
-      DbEntry(stem, e.path, p.relative(p.dirname(e.path), from: root), false),
+      DbEntry(stem, path, p.relative(p.dirname(path), from: root), false),
     );
   }
   return _sorted(entries);
 }
 
-final _http = HttpClient()..connectionTimeout = const Duration(seconds: 20);
-
-Future<List<int>> _get(String url, {bool json = false}) async {
-  final req = await _http.getUrl(Uri.parse(url));
-  req.headers.set(HttpHeaders.userAgentHeader, 'eqloader');
-  if (json) {
-    req.headers.set(HttpHeaders.acceptHeader, 'application/vnd.github+json');
-  }
-  final resp = await req.close().timeout(const Duration(seconds: 20));
-  final body = await resp.fold<List<int>>([], (a, b) => a..addAll(b));
-  if (resp.statusCode != 200) {
-    var detail = '';
-    try {
-      detail = ': ${jsonDecode(utf8.decode(body))['message']}';
-    } catch (_) {}
-    throw HttpException('HTTP ${resp.statusCode} for $url$detail');
-  }
-  return body;
-}
-
 Future<Map<String, dynamic>> _githubGet(String url) async =>
-    jsonDecode(utf8.decode(await _get(url, json: true)))
+    jsonDecode(utf8.decode(await io.httpGet(url, json: true)))
         as Map<String, dynamic>;
 
 /// Blob paths under one repo folder (by its own tree sha rather than the
@@ -188,18 +154,15 @@ Future<List<DbEntry>> fetchPrecomputedProfiles(
 
 /// Download (and locally cache) one file from the AutoEq repo.
 Future<String> fetchRemoteFile(String repoPath) async {
-  final cache = File(
-    p.joinAll([(await _cacheDir()).path, ...repoPath.split('/')]),
-  );
-  if (await cache.exists()) return cache.readAsString();
+  final cached = await io.readCache(repoPath);
+  if (cached != null) return utf8.decode(cached, allowMalformed: true);
 
   final url = _rawBase + repoPath.split('/').map(Uri.encodeComponent).join('/');
-  final content = await _get(url);
-  await cache.parent.create(recursive: true);
-  await cache.writeAsBytes(content);
+  final content = await io.httpGet(url);
+  await io.writeCache(repoPath, content);
   return utf8.decode(content, allowMalformed: true);
 }
 
 /// Contents of an index entry (downloading remote ones).
 Future<String> loadEntry(DbEntry e) =>
-    e.remote ? fetchRemoteFile(e.path) : File(e.path).readAsString();
+    e.remote ? fetchRemoteFile(e.path) : io.readLocalFile(e.path);
