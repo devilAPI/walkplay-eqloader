@@ -95,6 +95,17 @@ ThemeData buildTheme() {
         side: const BorderSide(color: Palette.line),
       ),
     ),
+    // Without this, SnackBar text uses the inverse (dark) color.
+    snackBarTheme: SnackBarThemeData(
+      backgroundColor: Palette.input,
+      contentTextStyle: const TextStyle(color: Palette.ink, fontSize: 14),
+      actionTextColor: Palette.accent,
+      behavior: SnackBarBehavior.floating,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(4),
+        side: const BorderSide(color: Palette.line),
+      ),
+    ),
     tooltipTheme: const TooltipThemeData(
       decoration: BoxDecoration(color: Palette.input),
       textStyle: TextStyle(color: Palette.ink, fontSize: 12),

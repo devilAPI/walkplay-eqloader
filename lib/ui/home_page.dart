@@ -142,13 +142,9 @@ class _HomePageState extends State<HomePage> implements TaskHost {
       if (error != null) {
         await showInfo(context, error.$1, '${error.$2}:\n$text');
       } else {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(text),
-            backgroundColor: Palette.input,
-            behavior: SnackBarBehavior.floating,
-          ),
-        );
+        // Styled by the theme's snackBarTheme.
+        ScaffoldMessenger.of(context)
+            .showSnackBar(SnackBar(content: Text(text)));
       }
       return null;
     } finally {
