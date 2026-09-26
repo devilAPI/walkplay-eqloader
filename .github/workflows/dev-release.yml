@@ -3,7 +3,7 @@ name: Dev release
 # Every push to main builds the APK and publishes it as a pre-release
 # named dev-<commit count>. Run it manually for any other branch.
 on:
-  push:
+  push: 
     branches: [main]
   workflow_dispatch:
 
