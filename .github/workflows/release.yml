@@ -49,6 +49,7 @@ jobs:
       # Flutter wants x.y.z; the app shows 1.N.0.
       build-name: ${{ needs.version.outputs.version }}.0
       build-number: ${{ needs.version.outputs.count }}
+      installer: true # Windows setup.exe next to the portable zip
 
   # A real release needs every platform, so any failed build stops it.
   release:

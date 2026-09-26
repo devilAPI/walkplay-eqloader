@@ -15,8 +15,8 @@ Or get the latest build from [Releases](../../releases):
 | Android | `…-android.apk` | Tested |
 | Linux x64 / arm64 | `…-linux-x64.tar.gz` | Tested |
 | Linux arm64 | `…-linux-arm64.tar.gz` | **Untested** |
-| Windows x64 | `…-windows-x64.zip` | Tested |
-| Windows arm64 | `…-windows-arm64.zip` | **Untested** |
+| Windows x64 | `…-windows-x64-setup.exe` (installer), `…-windows-x64.zip` (portable) | Tested |
+| Windows arm64 | `…-windows-arm64-setup.exe` (installer), `…-windows-arm64.zip` (portable) | **Untested** |
 | macOS (Intel + Apple Silicon) | `…-macos-universal.zip` | **Untested** |
 
 `v1.<number>` releases (v1.1, v1.2, ...) are the regular releases. `dev-<number>` pre-releases are automatic builds of the latest commit and may be unstable.
@@ -51,7 +51,11 @@ Install the APK and connect the dongle over USB-C / OTG. Android asks for permis
 
 ### Windows
 
-Extract the zip and run `eqloader.exe`. No driver is needed; the dongle uses the built-in Windows HID driver.
+Run the `-setup.exe` installer, or extract the portable zip anywhere and run `eqloader.exe`. No driver is needed; the dongle uses the built-in Windows HID driver.
+
+The installer adds a Start menu entry and an uninstaller (Settings → Apps). It can install for all users or, without admin rights, just for you. Running a newer installer upgrades an existing installation. The installer isn't code-signed, so Windows SmartScreen may warn "Windows protected your PC"; click **More info → Run anyway**.
+
+Installers are only built for `v1.<number>` releases; `dev-<number>` builds come as the portable zip only.
 
 ### macOS
 
