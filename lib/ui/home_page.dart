@@ -74,7 +74,7 @@ class _HomePageState extends State<HomePage> implements TaskHost {
   int _fieldsRevision = -1;
 
   final _logScroll = ScrollController();
-  int _logLength = 0;
+  int _logRevision = 0;
 
   @override
   void initState() {
@@ -108,8 +108,8 @@ class _HomePageState extends State<HomePage> implements TaskHost {
       _fieldsRevision = model.fieldsRevision;
       _loadEditorFields();
     }
-    if (model.logLines.length != _logLength) {
-      _logLength = model.logLines.length;
+    if (model.logRevision != _logRevision) {
+      _logRevision = model.logRevision;
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (_logScroll.hasClients) {
           _logScroll.jumpTo(_logScroll.position.maxScrollExtent);
@@ -167,10 +167,16 @@ class _HomePageState extends State<HomePage> implements TaskHost {
       _type = 'PK';
       return;
     }
-    _freq.text = f.freq.toString();
-    _gain.text = f.gain.toString();
-    _q.text = _bwMode ? qToBw(f.q).toStringAsFixed(3) : f.q.toString();
+    _setText(_freq, f.freq.toString());
+    _setText(_gain, f.gain.toString());
+    _setText(_q, _bwMode ? qToBw(f.q).toStringAsFixed(3) : f.q.toString());
     _type = f.type;
+  }
+
+  /// Assigning even unchanged text resets the selection and relayouts the
+  /// field; this runs several times a second while a band is dragged.
+  static void _setText(TextEditingController c, String text) {
+    if (c.text != text) c.text = text;
   }
 
   /// Live-apply one edited field to every selected band.
@@ -556,9 +562,10 @@ class _HomePageState extends State<HomePage> implements TaskHost {
               toolbarHeight: form == _FormFactor.short ? 44 : null,
               title: const Text('Walkplay PEQ Loader'),
               actions: [
-                ListenableBuilder(
-                  listenable: model,
-                  builder: (context, _) => Row(
+                _Select(
+                  model,
+                  () => (model.canUndo, model.canRedo),
+                  (context) => Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
                       IconButton(
@@ -863,35 +870,50 @@ class _HomePageState extends State<HomePage> implements TaskHost {
   /// Band list, [rows] rows tall.
   Widget _filterList(double rows) {
     final extent = _rowExtent;
-    return ListenableBuilder(
-      listenable: model,
-      builder: (context, _) {
-        final highlighted = model.selection;
-        return Section(
-          title: 'Filters',
-          trailing: Text(
-            '${model.filters.length} band(s)',
-            style: const TextStyle(color: Palette.muted, fontSize: 11),
+    return _Select(model, () => model.filters.length, (context) {
+      return Section(
+        title: 'Filters',
+        trailing: Text(
+          '${model.filters.length} band(s)',
+          style: const TextStyle(color: Palette.muted, fontSize: 11),
+        ),
+        child: Container(
+          height: extent * rows,
+          decoration: BoxDecoration(
+            color: Palette.panel,
+            border: Border.all(color: Palette.line),
           ),
-          child: Container(
-            height: extent * rows,
-            decoration: BoxDecoration(
-              color: Palette.panel,
-              border: Border.all(color: Palette.line),
-            ),
-            child: model.filters.isEmpty
-                ? const Center(
-                    child: Text(
-                      'No bands. Tap the graph or "Add Band".',
-                      style: TextStyle(color: Palette.muted),
-                    ),
-                  )
-                : ListView.builder(
-                    itemCount: model.filters.length,
-                    itemExtent: extent,
-                    itemBuilder: (context, i) {
+          child: model.filters.isEmpty
+              ? const Center(
+                  child: Text(
+                    'No bands. Tap the graph or "Add Band".',
+                    style: TextStyle(color: Palette.muted),
+                  ),
+                )
+              : ListView.builder(
+                  itemCount: model.filters.length,
+                  itemExtent: extent,
+                  // Each row rebuilds only when its own text or highlight
+                  // changes, i.e. just the dragged band during a drag.
+                  itemBuilder: (context, i) => _Select(
+                    model,
+                    () {
+                      if (i >= model.filters.length) return null;
                       final f = model.filters[i];
-                      final sel = highlighted.contains(i);
+                      return (
+                        f.freq,
+                        f.gain,
+                        f.q,
+                        f.type,
+                        model.selection.contains(i),
+                      );
+                    },
+                    (context) {
+                      if (i >= model.filters.length) {
+                        return const SizedBox.shrink();
+                      }
+                      final f = model.filters[i];
+                      final sel = model.selection.contains(i);
                       return InkWell(
                         onTap: () {
                           final kb = HardwareKeyboard.instance;
@@ -926,15 +948,22 @@ class _HomePageState extends State<HomePage> implements TaskHost {
                       );
                     },
                   ),
-          ),
-        );
-      },
-    );
+                ),
+        ),
+      );
+    });
   }
 
-  Widget _editor() => ListenableBuilder(
-    listenable: model,
-    builder: (context, _) {
+  // Field values update through their controllers; the section itself only
+  // depends on these, so it doesn't rebuild on every drag step.
+  Widget _editor() => _Select(
+    model,
+    () => (
+      model.primary != null,
+      model.effectiveSelection.length,
+      model.primary?.type,
+    ),
+    (context) {
       final enabled = model.primary != null;
       final count = model.effectiveSelection.length;
       return Section(
@@ -1187,9 +1216,10 @@ class _HomePageState extends State<HomePage> implements TaskHost {
       height: height,
       decoration: BoxDecoration(border: Border.all(color: Palette.line)),
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
-      child: ListenableBuilder(
-        listenable: model,
-        builder: (context, _) => SelectionArea(
+      child: _Select(
+        model,
+        () => model.logRevision,
+        (context) => SelectionArea(
           child: ListView.builder(
             controller: _logScroll,
             itemCount: model.logLines.length,
@@ -1223,6 +1253,53 @@ String errorText(Object e) => switch (e) {
 // ---------------------------------------------------------------------------
 // Small field widgets
 // ---------------------------------------------------------------------------
+
+/// Like [ListenableBuilder], but rebuilds only when [select]'s value changes
+/// rather than on every notification.
+class _Select<T> extends StatefulWidget {
+  final Listenable listenable;
+  final T Function() select;
+  final WidgetBuilder builder;
+  const _Select(this.listenable, this.select, this.builder);
+
+  @override
+  State<_Select<T>> createState() => _SelectState<T>();
+}
+
+class _SelectState<T> extends State<_Select<T>> {
+  late T _value;
+
+  @override
+  void initState() {
+    super.initState();
+    _value = widget.select();
+    widget.listenable.addListener(_changed);
+  }
+
+  @override
+  void didUpdateWidget(_Select<T> old) {
+    super.didUpdateWidget(old);
+    if (old.listenable != widget.listenable) {
+      old.listenable.removeListener(_changed);
+      widget.listenable.addListener(_changed);
+    }
+    _value = widget.select();
+  }
+
+  @override
+  void dispose() {
+    widget.listenable.removeListener(_changed);
+    super.dispose();
+  }
+
+  void _changed() {
+    final value = widget.select();
+    if (value != _value) setState(() => _value = value);
+  }
+
+  @override
+  Widget build(BuildContext context) => widget.builder(context);
+}
 
 class _LabeledRow extends StatelessWidget {
   final String label;

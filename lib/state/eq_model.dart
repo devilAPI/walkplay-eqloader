@@ -52,7 +52,11 @@ class EqModel extends ChangeNotifier {
 
   final logLines = <String>[];
 
+  /// Bumped on every [log]; [logLines] stops growing once capped.
+  int logRevision = 0;
+
   void log(String text) {
+    logRevision++;
     logLines.addAll(text.trimRight().split('\n'));
     if (logLines.length > 2000) logLines.removeRange(0, logLines.length - 2000);
     notifyListeners();
