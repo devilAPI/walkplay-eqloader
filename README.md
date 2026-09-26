@@ -3,4 +3,4 @@ Already works
 
 Tested on Linux, Android.
 
-Should work on Windows and macOS as well.
+Windows and macOS implementation is still untested
