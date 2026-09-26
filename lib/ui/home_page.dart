@@ -367,13 +367,24 @@ class _HomePageState extends State<HomePage> implements TaskHost {
     if (result != null) model.setFilters(result.filters, result.preamp);
   }
 
-  /// Push the EQ; true after a successful push.
-  Future<bool> _push() async {
+  /// Push the EQ; true after a successful push. [confirm] false when the
+  /// user already chose to push (the quit dialog).
+  Future<bool> _push({bool confirm = true}) async {
     if (model.filters.isEmpty) {
       await showInfo(context, 'No Filters', 'Add at least one EQ band first.');
       return false;
     }
     final slot = parseIntText(_slot.text, 0)!;
+    if (confirm &&
+        !await askYesNo(
+          context,
+          'Push EQ to Device',
+          'Push ${model.filters.length} band(s) to slot $slot on the device? '
+              'This overwrites the EQ stored in that slot.',
+        )) {
+      return false;
+    }
+    if (!mounted) return false;
     final preamp = parseDoubleText(model.preamp, 0)!;
     final buffer = parseDoubleText(_buffer.text, defaultGlobalGainBuffer)!;
     final max = maxFilters;
@@ -434,7 +445,7 @@ class _HomePageState extends State<HomePage> implements TaskHost {
       );
       return switch (choice) {
         'quit' => true,
-        'push' => await _push(),
+        'push' => await _push(confirm: false),
         'save' => await _saveProfile(),
         _ => false,
       };
@@ -451,6 +462,13 @@ class _HomePageState extends State<HomePage> implements TaskHost {
   // ------------------------------------------------------------------
 
   List<_Action> get _actions => [
+    ..._bandActions,
+    _loadFromDeviceAction,
+    ..._fileActions,
+    _pushAction,
+  ];
+
+  List<_Action> get _bandActions => [
     (
       'Add Band',
       () => model.addBand(),
@@ -476,13 +494,17 @@ class _HomePageState extends State<HomePage> implements TaskHost {
         shift: true,
       ),
     ),
-    (
-      'Load EQ from Device',
-      _loadFromDevice,
-      ButtonKind.normal,
-      'Ctrl+E',
-      const SingleActivator(LogicalKeyboardKey.keyE, control: true),
-    ),
+  ];
+
+  _Action get _loadFromDeviceAction => (
+    'Load EQ from Device',
+    _loadFromDevice,
+    ButtonKind.normal,
+    'Ctrl+E',
+    const SingleActivator(LogicalKeyboardKey.keyE, control: true),
+  );
+
+  List<_Action> get _fileActions => [
     (
       'Save Profile to File',
       _saveProfile,
@@ -519,14 +541,15 @@ class _HomePageState extends State<HomePage> implements TaskHost {
         shift: true,
       ),
     ),
-    (
-      'Push EQ to Device',
-      _push,
-      ButtonKind.accent,
-      'Ctrl+P',
-      const SingleActivator(LogicalKeyboardKey.keyP, control: true),
-    ),
   ];
+
+  _Action get _pushAction => (
+    'Push EQ to Device',
+    _push,
+    ButtonKind.accent,
+    'Ctrl+P',
+    const SingleActivator(LogicalKeyboardKey.keyP, control: true),
+  );
 
   Map<ShortcutActivator, VoidCallback> get _shortcuts => {
     for (final a in _actions)
@@ -560,8 +583,26 @@ class _HomePageState extends State<HomePage> implements TaskHost {
           child: Scaffold(
             appBar: AppBar(
               toolbarHeight: form == _FormFactor.short ? 44 : null,
-              title: const Text('Walkplay PEQ Loader'),
+              title: const FittedBox(
+                fit: BoxFit.scaleDown,
+                child: Text('Walkplay PEQ Loader'),
+              ),
               actions: [
+                // Phones show one tab at a time; keep the device transfers
+                // always reachable.
+                if (form == _FormFactor.compact ||
+                    form == _FormFactor.short) ...[
+                  IconButton(
+                    tooltip: _loadFromDeviceAction.$1,
+                    icon: const Icon(Icons.download),
+                    onPressed: _loadFromDevice,
+                  ),
+                  IconButton(
+                    tooltip: _pushAction.$1,
+                    icon: const Icon(Icons.upload, color: Palette.accent),
+                    onPressed: _push,
+                  ),
+                ],
                 _Select(
                   model,
                   () => (model.canUndo, model.canRedo),
@@ -616,8 +657,71 @@ class _HomePageState extends State<HomePage> implements TaskHost {
     child: EqGraph(model: model, onDeleteRequest: _confirmDeleteBand),
   );
 
-  /// Phone portrait: graph pinned on top, everything else scrolls below it
-  /// (so dragging bands never fights the scroll view).
+  // ---- phone layouts ---------------------------------------------------
+  //
+  // Phones get the graph plus one tab of controls at a time instead of every
+  // desktop panel stacked into one long scroll.
+
+  int _phoneTab = 0;
+
+  static const _phoneTabs = [
+    (Icons.tune, 'EQ'),
+    (Icons.usb, 'Device'),
+    (Icons.folder_open, 'Files'),
+    (Icons.notes, 'Log'),
+  ];
+
+  Widget _phoneTabView(int columns) {
+    if (_phoneTab == 3) {
+      return Padding(
+        padding: const EdgeInsets.all(8),
+        child: _logSection(null),
+      );
+    }
+    return ListView(
+      key: PageStorageKey(_phoneTab),
+      padding: const EdgeInsets.all(8),
+      children: switch (_phoneTab) {
+        0 => [
+          _filterList(3.5, headerActions: true),
+          _gap,
+          _editor(),
+          _gap,
+          Section(
+            title: 'Preamp',
+            child: Align(
+              alignment: Alignment.centerLeft,
+              child: _preampField(),
+            ),
+          ),
+        ],
+        1 => [
+          _buttonGrid(columns, [_pushAction, _loadFromDeviceAction]),
+          _gap,
+          Section(
+            title: 'Push Settings',
+            child: Wrap(
+              spacing: 10,
+              runSpacing: 8,
+              children: [_slotField(), _bufferField()],
+            ),
+          ),
+          _gap,
+          _peqEnable(),
+          _gap,
+          _deviceSection(),
+        ],
+        _ => [
+          Section(title: 'Files', child: _buttonGrid(columns, _fileActions)),
+        ],
+      },
+    );
+  }
+
+  void _selectPhoneTab(int i) => setState(() => _phoneTab = i);
+
+  /// Phone portrait: graph pinned on top, the selected tab below it, tabs
+  /// at the bottom (so dragging bands never fights the scroll view).
   Widget _compactLayout(BoxConstraints c) {
     final graphHeight = (c.maxHeight * 0.36).clamp(200.0, 360.0);
     return Column(
@@ -626,68 +730,58 @@ class _HomePageState extends State<HomePage> implements TaskHost {
           padding: const EdgeInsets.fromLTRB(8, 8, 8, 0),
           child: SizedBox(height: graphHeight, child: _graphView),
         ),
-        Expanded(
-          child: ListView(
-            padding: const EdgeInsets.all(8),
-            children: [
-              _filterList(4.5),
-              _gap,
-              _editor(),
-              _gap,
-              _actionsGrid(c.maxWidth >= 480 ? 3 : 2),
-              _gap,
-              _eqSettings(),
-              _gap,
-              _peqEnable(),
-              _gap,
-              _deviceSection(),
-              _gap,
-              _logSection(160),
-            ],
-          ),
+        Expanded(child: _phoneTabView(c.maxWidth >= 480 ? 2 : 1)),
+        NavigationBar(
+          height: 64,
+          backgroundColor: Palette.panel,
+          indicatorColor: Palette.input,
+          selectedIndex: _phoneTab,
+          onDestinationSelected: _selectPhoneTab,
+          destinations: [
+            for (final (icon, label) in _phoneTabs)
+              NavigationDestination(
+                icon: Icon(icon),
+                selectedIcon: Icon(icon, color: Palette.accent),
+                label: label,
+              ),
+          ],
         ),
       ],
     );
   }
 
-  /// Phone landscape: graph uses the full height on the left, controls
-  /// scroll on the right.
+  /// Phone landscape: graph uses the full height on the left, the selected
+  /// tab in the middle, tabs as a rail on the right.
   Widget _shortLayout(BoxConstraints c) {
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(8, 0, 0, 0),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          Expanded(
-            flex: 11,
-            child: Padding(
-              padding: const EdgeInsets.symmetric(vertical: 8),
-              child: _graphView,
-            ),
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Expanded(
+          flex: 11,
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(8, 8, 0, 8),
+            child: _graphView,
           ),
-          Expanded(
-            flex: 9,
-            child: ListView(
-              padding: const EdgeInsets.all(8),
-              children: [
-                _filterList(3.5),
-                _gap,
-                _editor(),
-                _gap,
-                _actionsGrid(2),
-                _gap,
-                _eqSettings(),
-                _gap,
-                _peqEnable(),
-                _gap,
-                _deviceSection(),
-                _gap,
-                _logSection(140),
-              ],
-            ),
-          ),
-        ],
-      ),
+        ),
+        Expanded(flex: 9, child: _phoneTabView(1)),
+        NavigationRail(
+          backgroundColor: Palette.panel,
+          indicatorColor: Palette.input,
+          labelType: NavigationRailLabelType.all,
+          minWidth: 64,
+          groupAlignment: 0,
+          selectedIndex: _phoneTab,
+          onDestinationSelected: _selectPhoneTab,
+          destinations: [
+            for (final (icon, label) in _phoneTabs)
+              NavigationRailDestination(
+                icon: Icon(icon),
+                selectedIcon: Icon(icon, color: Palette.accent),
+                label: Text(label),
+              ),
+          ],
+        ),
+      ],
     );
   }
 
@@ -820,8 +914,8 @@ class _HomePageState extends State<HomePage> implements TaskHost {
           for (final a in _actions)
             Padding(
               padding: const EdgeInsets.symmetric(vertical: 3),
-              child: SizedBox(
-                height: _touch ? 52 : 46,
+              child: ConstrainedBox(
+                constraints: BoxConstraints(minHeight: _touch ? 52 : 46),
                 child: _actionButton(a),
               ),
             ),
@@ -830,53 +924,94 @@ class _HomePageState extends State<HomePage> implements TaskHost {
     ),
   );
 
-  Widget _actionsGrid(int columns) => Section(
-    title: 'Actions',
-    child: LayoutBuilder(
-      builder: (context, c) {
-        const spacing = 6.0;
-        final w = (c.maxWidth - spacing * (columns - 1)) / columns;
-        return Wrap(
-          spacing: spacing,
-          runSpacing: spacing,
-          children: [
-            for (final a in _actions)
-              SizedBox(
-                width: w,
-                height: _touch ? 48 : 42,
-                child: _actionButton(a),
+  Widget _actionsGrid(int columns) =>
+      Section(title: 'Actions', child: _buttonGrid(columns, _actions));
+
+  /// [actions] in rows of [columns]; each row is as tall as its tallest
+  /// label needs (long labels wrap instead of being clipped).
+  Widget _buttonGrid(int columns, List<_Action> actions) {
+    const spacing = 6.0;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        for (var r = 0; r < actions.length; r += columns)
+          Padding(
+            padding: EdgeInsets.only(top: r == 0 ? 0 : spacing),
+            child: IntrinsicHeight(
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  for (var i = r; i < r + columns; i++) ...[
+                    if (i > r) const SizedBox(width: spacing),
+                    Expanded(
+                      child: i < actions.length
+                          ? ConstrainedBox(
+                              constraints: BoxConstraints(
+                                minHeight: _touch ? 48 : 42,
+                              ),
+                              child: _actionButton(actions[i]),
+                            )
+                          : const SizedBox.shrink(),
+                    ),
+                  ],
+                ],
               ),
-          ],
-        );
-      },
-    ),
-  );
+            ),
+          ),
+      ],
+    );
+  }
 
   Widget _actionButton(_Action a) => Tooltip(
     message: a.$4,
     waitDuration: const Duration(milliseconds: 600),
     child: FilledButton(
-      style: styleFor(a.$3),
-      onPressed: a.$2,
-      child: Text(
-        a.$1,
-        textAlign: TextAlign.center,
-        maxLines: 2,
-        overflow: TextOverflow.ellipsis,
+      style: (styleFor(a.$3) ?? const ButtonStyle()).merge(
+        FilledButton.styleFrom(
+          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+        ),
       ),
+      onPressed: a.$2,
+      child: Text(a.$1, textAlign: TextAlign.center),
     ),
   );
 
   /// Band list, [rows] rows tall.
-  Widget _filterList(double rows) {
+  ///
+  /// [headerActions]: add/delete as icons in the header (phones, where a
+  /// row of text buttons costs too much height).
+  Widget _filterList(double rows, {bool headerActions = false}) {
     final extent = _rowExtent;
     return _Select(model, () => model.filters.length, (context) {
+      final count = Text(
+        '${model.filters.length} band(s)',
+        style: const TextStyle(color: Palette.muted, fontSize: 11),
+      );
       return Section(
-        title: 'Filters',
-        trailing: Text(
-          '${model.filters.length} band(s)',
-          style: const TextStyle(color: Palette.muted, fontSize: 11),
-        ),
+        title: headerActions ? 'Filters (${model.filters.length})' : 'Filters',
+        trailing: headerActions
+            ? Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  for (final (a, icon) in [
+                    (_bandActions[0], Icons.add),
+                    (_bandActions[1], Icons.remove_circle_outline),
+                    (_bandActions[2], Icons.delete_sweep_outlined),
+                  ])
+                    IconButton(
+                      tooltip: a.$1,
+                      visualDensity: VisualDensity.compact,
+                      icon: Icon(
+                        icon,
+                        color: a.$3 == ButtonKind.danger
+                            ? Palette.danger
+                            : Palette.accent,
+                      ),
+                      onPressed: a.$2,
+                    ),
+                ],
+              )
+            : count,
         child: Container(
           height: extent * rows,
           decoration: BoxDecoration(
@@ -1048,18 +1183,22 @@ class _HomePageState extends State<HomePage> implements TaskHost {
     child: Wrap(
       spacing: 10,
       runSpacing: 8,
-      children: [
-        _SmallField(label: 'Slot', controller: _slot, width: 70, intOnly: true),
-        _SmallField(
-          label: 'Preamp (dB)',
-          controller: _preamp,
-          width: 110,
-          onChanged: (t) => model.setPreampText(t),
-        ),
-        _SmallField(label: 'Buffer (dB)', controller: _buffer, width: 110),
-      ],
+      children: [_slotField(), _preampField(), _bufferField()],
     ),
   );
+
+  Widget _slotField() =>
+      _SmallField(label: 'Slot', controller: _slot, width: 70, intOnly: true);
+
+  Widget _preampField() => _SmallField(
+    label: 'Preamp (dB)',
+    controller: _preamp,
+    width: 110,
+    onChanged: (t) => model.setPreampText(t),
+  );
+
+  Widget _bufferField() =>
+      _SmallField(label: 'Buffer (dB)', controller: _buffer, width: 110);
 
   Widget _peqEnable() => Section(
     title: 'PEQ Enable / Disable',
@@ -1182,12 +1321,12 @@ class _HomePageState extends State<HomePage> implements TaskHost {
               _SmallField(
                 label: 'PID (hex, optional)',
                 controller: _pid,
-                width: 140,
+                width: 150,
               ),
               _SmallField(
                 label: 'Max filters',
                 controller: _maxFilters,
-                width: 90,
+                width: 100,
                 intOnly: true,
               ),
             ],
@@ -1197,8 +1336,10 @@ class _HomePageState extends State<HomePage> implements TaskHost {
     );
   }
 
-  Widget _logSection(double height) => Section(
+  /// [height] null: fill the available height.
+  Widget _logSection(double? height) => Section(
     title: 'Log',
+    expand: height == null,
     trailing: Row(
       mainAxisSize: MainAxisSize.min,
       children: [
@@ -1311,7 +1452,10 @@ class _LabeledRow extends StatelessWidget {
     padding: const EdgeInsets.symmetric(vertical: 3),
     child: Row(
       children: [
-        SizedBox(width: 120, child: Text(label)),
+        SizedBox(
+          width: MediaQuery.sizeOf(context).width < 480 ? 96 : 120,
+          child: Text(label),
+        ),
         Expanded(child: child),
       ],
     ),
@@ -1417,10 +1561,14 @@ class _SmallField extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => SizedBox(
-    width: width,
+    width: MediaQuery.textScalerOf(context).scale(width),
     child: TextField(
       controller: controller,
-      decoration: InputDecoration(labelText: label),
+      // Floated labels are smaller, so they fit the narrow fields.
+      decoration: InputDecoration(
+        labelText: label,
+        floatingLabelBehavior: FloatingLabelBehavior.always,
+      ),
       keyboardType: intOnly
           ? TextInputType.number
           : const TextInputType.numberWithOptions(decimal: true, signed: true),

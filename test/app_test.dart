@@ -76,14 +76,21 @@ void main() {
       expect(find.text('Walkplay PEQ Loader'), findsOneWidget);
       expect(find.textContaining('1: 1000.0 Hz'), findsOneWidget);
 
-      await revealText(tester, 'Add Band');
-      await tester.ensureVisible(find.text('Add Band'));
-      await tester.pumpAndSettle();
-      await tester.tap(find.text('Add Band'));
-      await tester.pumpAndSettle();
-      // Scroll the band list back into view (single-column layouts).
-      await tester.drag(find.text('Add Band'), const Offset(0, 3000));
-      await tester.pumpAndSettle();
+      // Phones: an icon in the band list header; else a text button.
+      final addIcon = find.byTooltip('Add Band');
+      if (addIcon.evaluate().isNotEmpty) {
+        await tester.tap(addIcon);
+        await tester.pumpAndSettle();
+      } else {
+        await revealText(tester, 'Add Band');
+        await tester.ensureVisible(find.text('Add Band'));
+        await tester.pumpAndSettle();
+        await tester.tap(find.text('Add Band'));
+        await tester.pumpAndSettle();
+        // Scroll the band list back into view (single-column layouts).
+        await tester.drag(find.text('Add Band'), const Offset(0, 3000));
+        await tester.pumpAndSettle();
+      }
       expect(find.textContaining('2: 1000.0 Hz'), findsOneWidget);
 
       await tester.tap(find.byTooltip('Undo (Ctrl+Z)'));

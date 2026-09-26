@@ -1,2 +1,6 @@
 # eqloader-flutter
-work in progress, currently broken
+Already works
+
+Tested on Linux, Android.
+
+Should work on Windows and macOS as well.

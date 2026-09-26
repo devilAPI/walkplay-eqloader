@@ -131,12 +131,16 @@ class Section extends StatelessWidget {
   final EdgeInsets padding;
   final Widget? trailing;
 
+  /// Fill the available height, giving the rest to [child].
+  final bool expand;
+
   const Section({
     super.key,
     required this.title,
     required this.child,
     this.padding = const EdgeInsets.all(8),
     this.trailing,
+    this.expand = false,
   });
 
   @override
@@ -149,7 +153,7 @@ class Section extends StatelessWidget {
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
-        mainAxisSize: MainAxisSize.min,
+        mainAxisSize: expand ? MainAxisSize.max : MainAxisSize.min,
         children: [
           Padding(
             padding: const EdgeInsets.fromLTRB(8, 6, 8, 0),
@@ -169,7 +173,12 @@ class Section extends StatelessWidget {
               ],
             ),
           ),
-          Padding(padding: padding, child: child),
+          if (expand)
+            Expanded(
+              child: Padding(padding: padding, child: child),
+            )
+          else
+            Padding(padding: padding, child: child),
         ],
       ),
     );
