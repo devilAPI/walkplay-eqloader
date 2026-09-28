@@ -26,12 +26,15 @@ Device support on Windows, macOS and in the browser is new and hasn't been tried
 ## Features
 
 - **Visual EQ editor**: tap/click the graph to add a band, drag a handle to move it. Right-click (mouse) or long-press (touch) a handle to delete it. Values can also be typed in, and several selected bands can be edited at once.
-- **Filter types**: Peaking (PK), Low Shelf (LSQ), High Shelf (HSQ), Low Pass (LP), High Pass (HP). Q can be shown as bandwidth in octaves.
+- **Filter types**: Peaking (PK), Low Shelf (LSQ), High Shelf (HSQ), Low Pass (LP), High Pass (HP). Q can be shown as bandwidth in octaves (Settings).
 - **Device**: push the EQ to any PEQ slot, load the current EQ back from the device, and enable/disable PEQ per slot.
-- **Profiles**: save and load the `.txt` format used by EqualizerAPO and eq.hangout.audio.
+- **Profile library**: keep named profiles in the app, load one with a tap, and see which profile is on which device slot.
+- **Profile files**: save and load the `.txt` format used by EqualizerAPO and eq.hangout.audio.
 - **AutoEQ**: pick a headphone/IEM model from the [AutoEq](https://github.com/jaakkopasanen/AutoEq) database and generate EQ bands plus a clip-safe preamp, or load the profile the AutoEq project already computed for it.
+- **Flat reference line** on the graph: the level you hear with the EQ off, shifted by the preamp.
 - **Undo/redo** for all editor changes.
-- **Phone layout**: the graph stays on top and the controls are split into EQ, Device, Files and Log tabs.
+- **Installable web app** that keeps working offline.
+- **Phone layout**: the graph stays on top and the controls are split into EQ, Device, Profiles and Settings tabs.
 
 ## Setup
 
@@ -43,7 +46,9 @@ Plug in the dongle, open the **Device** section and click **Connect Device**, th
 
 On Linux, the browser needs the same udev rule as the Linux app (see [Linux](#linux)).
 
-Differences from the installed app: AutoEQ can only use the online database (no local folder), downloaded measurements aren't cached between visits, and saved profiles go to your downloads folder.
+Differences from the installed app: AutoEQ can only use the online database (no local folder), and saved profile files go to your downloads folder. The profile library and settings are stored in the browser.
+
+To install it as an app, use **Settings → Install as an app**, or the install icon in the address bar. Once loaded, it works offline, including AutoEQ models you've opened before.
 
 ### Android
 
@@ -88,15 +93,17 @@ On phones and small screens, **Push EQ to Device** and **Load EQ from Device** a
 1. Tap the graph to place a band, then drag it, or type exact values in the **Selected Filter** panel. Changes apply immediately.
 2. Pick the filter type in **Type**.
 3. To edit several bands at once, Ctrl-/Shift-click them in the **Filters** list (long-press on touch); a changed field applies to all selected bands.
-4. Set **Slot**, **Preamp** and **Buffer** and click **Push EQ to Device**. You're asked to confirm before the slot is overwritten.
+4. Set **Slot** and **Preamp** and click **Push EQ to Device**. You're asked to confirm before the slot is overwritten.
+
+The dashed **FLAT** line on the graph is the level with the EQ off. The preamp lowers everything you hear, so the line moves the opposite way: with a −6 dB preamp it sits at +6 dB. Where the curve is above it, the EQ is louder than no EQ. Toggle it with **FLAT** in the graph's corner.
 
 ### Preamp and buffer
 
-The Protocol Micro always attenuates its output by a fixed 5 dB, set as **Buffer** (default `-5`). The device only stores the preamp beyond that, in whole dB: a preamp of −4.4 dB needs no extra attenuation, −9.6 dB is stored as 5 dB extra. **Load EQ from Device** reports the resulting preamp (stored value + buffer), so an exact preamp only survives through a saved profile file. If your device has no such buffer, set **Buffer** to `0`.
+The Protocol Micro always attenuates its output by a fixed 5 dB, set as **Settings → Hardware buffer** (default `-5`). The device only stores the preamp beyond that, in whole dB: a preamp of −4.4 dB needs no extra attenuation, −9.6 dB is stored as 5 dB extra. **Load EQ from Device** reports the resulting preamp (stored value + buffer), so an exact preamp only survives through a saved profile file. If your device has no such buffer, set it to `0`.
 
 ### Max filters
 
-**Max filters** (default `8`) is the number of PEQ bands the device stores. Pushes are padded with inert 0 dB bands, because otherwise the device fills unused slots with copies of the last band. If the EQ has more bands than this, you're warned first: the device would silently drop the extras.
+**Settings → Max filters** (default `8`) is the number of PEQ bands the device stores. Pushes are padded with inert 0 dB bands, because otherwise the device fills unused slots with copies of the last band. If the EQ has more bands than this, you're warned first: the device would silently drop the extras.
 
 ### AutoEQ
 
@@ -112,11 +119,26 @@ The Protocol Micro always attenuates its output by a fixed 5 dB, set as **Buffer
 
 The AutoEQ database is fetched from GitHub, so AutoEQ needs an internet connection; everything else works offline.
 
-### Profiles and backups
+### Profile library
+
+The **Library** panel (the **Profiles** tab on phones) keeps named profiles in the app.
+
+- **Save to Library** (bookmark icon, Ctrl+Shift+S) stores the current EQ under a name. The profile you're editing is marked with a check until you change it.
+- Tap a profile to load it (undoable). Its menu has **Rename**, **Export to File** and **Delete**.
+- **Import File to Library** adds a `.txt` profile.
+- Pushing records which profile went to which slot, and **Load EQ from Device** recognizes a library profile on the device. The **Device** panel lists this per slot for the selected dongle.
+
+### Profile files and backups
 
 - **Load Profile from File** loads a `.txt` profile. OFF bands, zero-gain bands and duplicate bands are dropped.
 - **Save Profile to File** saves the current EQ and preamp.
-- To back up the device, use **Load EQ from Device**, then **Save Profile to File**.
+- To back up the device, use **Load EQ from Device**, then **Save Profile to File** or **Save to Library**.
+
+### Settings
+
+**Settings** (the gear icon; a tab on phones) has the flat reference line, Q as bandwidth, **Max filters**, **Hardware buffer**, installing the web app, the **Log** (device messages, plus diagnostics to paste into an issue) and **About** (version and links to this repository).
+
+**Get Slot / Version** (Ctrl+G) shows the dongle's firmware version, active slot and what was last written to that slot.
 
 ### Enabling / disabling the EQ
 
@@ -135,6 +157,7 @@ Shortcuts are also shown when hovering over a button.
 | Ctrl+Shift+D | Delete All |
 | Ctrl+E | Load EQ from Device |
 | Ctrl+S | Save Profile to File |
+| Ctrl+Shift+S | Save to Library |
 | Ctrl+O | Load Profile from File |
 | Ctrl+Shift+A | Compute AutoEQ |
 | Ctrl+Shift+L | Load Pre-computed AutoEQ |

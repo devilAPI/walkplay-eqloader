@@ -74,6 +74,72 @@ Future<void> showInfo(BuildContext context, String title, String message) =>
       focus: 'OK',
     );
 
+/// Ask for a line of text; null when cancelled or left blank.
+Future<String?> askText(
+  BuildContext context,
+  String title,
+  String label, {
+  String initial = '',
+  String confirm = 'OK',
+}) async {
+  final text = await showDialog<String>(
+    context: context,
+    builder: (_) => _TextDialog(title, label, initial, confirm),
+  );
+  final trimmed = text?.trim();
+  return trimmed == null || trimmed.isEmpty ? null : trimmed;
+}
+
+/// Owns its controller: the dialog still builds during its exit animation.
+class _TextDialog extends StatefulWidget {
+  final String title, label, initial, confirm;
+  const _TextDialog(this.title, this.label, this.initial, this.confirm);
+
+  @override
+  State<_TextDialog> createState() => _TextDialogState();
+}
+
+class _TextDialogState extends State<_TextDialog> {
+  late final _controller = TextEditingController(text: widget.initial)
+    ..selection = TextSelection(
+      baseOffset: 0,
+      extentOffset: widget.initial.length,
+    );
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  void _submit() => Navigator.of(context).pop(_controller.text);
+
+  @override
+  Widget build(BuildContext context) => AlertDialog(
+    title: Text(widget.title, style: const TextStyle(fontSize: 16)),
+    content: ConstrainedBox(
+      constraints: const BoxConstraints(minWidth: 280, maxWidth: 440),
+      child: TextField(
+        controller: _controller,
+        autofocus: true,
+        decoration: InputDecoration(labelText: widget.label),
+        onSubmitted: (_) => _submit(),
+      ),
+    ),
+    actions: [
+      FilledButton(
+        onPressed: () => Navigator.of(context).pop(),
+        child: const Text('Cancel'),
+      ),
+      FilledButton(
+        style: styleFor(ButtonKind.accent),
+        onPressed: _submit,
+        child: Text(widget.confirm),
+      ),
+    ],
+  );
+}
+
 /// Modal, not user-closable spinner; returns a function that closes it.
 VoidCallback showBusy(BuildContext context, String title, String message) {
   final navigator = Navigator.of(context);

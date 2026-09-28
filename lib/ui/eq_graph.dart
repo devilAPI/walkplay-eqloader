@@ -8,6 +8,7 @@ import 'package:flutter/material.dart';
 import '../core/band.dart';
 import '../core/dsp.dart';
 import '../state/eq_model.dart';
+import '../state/settings.dart';
 import 'theme.dart';
 
 const graphGainLimit = 15.0; // dB; graph y-range and drag clamp
@@ -41,17 +42,24 @@ class _Axes {
 /// its frequency/gain. Right-click (mouse) or long-press (touch) a handle:
 /// delete it.
 ///
+/// The trace is the bands' summed response; the preamp shifts the whole
+/// output, so the optional flat reference (what you hear with the EQ off) is
+/// drawn at -preamp instead of shifting the trace off its handles. Where the
+/// trace is above the reference, the EQ is louder than bypass.
+///
 /// Performance: the grid is its own cached layer that only repaints on
 /// resize; the trace/handle layer repaints straight from [EqModel]
 /// notifications without rebuilding widgets, and recomputes only the
 /// response of bands that actually changed.
 class EqGraph extends StatefulWidget {
   final EqModel model;
+  final Settings settings;
   final Future<void> Function(int index) onDeleteRequest;
 
   const EqGraph({
     super.key,
     required this.model,
+    required this.settings,
     required this.onDeleteRequest,
   });
 
@@ -67,7 +75,10 @@ class _EqGraphState extends State<EqGraph> {
   double _slop = 0;
   Timer? _longPress;
   _Axes? _axes;
-  late final _TracePainter _tracePainter = _TracePainter(widget.model);
+  late final _TracePainter _tracePainter = _TracePainter(
+    widget.model,
+    widget.settings,
+  );
 
   EqModel get model => widget.model;
 
@@ -176,6 +187,12 @@ class _EqGraphState extends State<EqGraph> {
               RepaintBoundary(child: CustomPaint(painter: _GridPainter(axes))),
               RepaintBoundary(
                 child: CustomPaint(painter: _tracePainter..axes = axes),
+              ),
+              Positioned(
+                top: 0,
+                right: 4,
+                height: axes.plot.top,
+                child: _FlatToggle(widget.settings),
               ),
             ],
           ),
@@ -349,11 +366,14 @@ class _ResponseCache {
   }
 }
 
-/// Response trace and band handles; repaints directly on model changes.
+/// Response trace, flat reference and band handles; repaints directly on
+/// model and settings changes.
 class _TracePainter extends CustomPainter {
   final EqModel model;
+  final Settings settings;
   _Axes? axes;
-  _TracePainter(this.model) : super(repaint: model.graph);
+  _TracePainter(this.model, this.settings)
+    : super(repaint: Listenable.merge([model.graph, settings]));
 
   final _cache = _ResponseCache();
   Path? _trace, _fill;
@@ -377,6 +397,10 @@ class _TracePainter extends CustomPainter {
   static final _dotActive = Paint()..color = Palette.active;
   static final _dotIdle = Paint()..color = Palette.accent;
   static final _numbers = <(int, bool), TextPainter>{};
+  static final _reference = Paint()
+    ..color = Palette.ink.withValues(alpha: 0.55)
+    ..strokeWidth = 1.2;
+  static final _referenceLabel = _label('FLAT', size: 9, bold: true);
 
   static TextPainter _number(int n, bool hi) => _numbers.putIfAbsent((
     n,
@@ -414,6 +438,7 @@ class _TracePainter extends CustomPainter {
 
     canvas.save();
     canvas.clipRect(axes.plot);
+    if (settings.showFlatReference) _paintReference(canvas, axes);
     canvas.drawPath(_fill!, _fillPaint);
     canvas.drawPath(_trace!, _glowPaint);
     canvas.drawPath(_trace!, _tracePaint);
@@ -436,6 +461,66 @@ class _TracePainter extends CustomPainter {
     canvas.restore();
   }
 
+  /// Dashed line where the output equals the bypassed (EQ off) level.
+  void _paintReference(Canvas canvas, _Axes axes) {
+    final y = axes.y(flatReferenceGain(model.preampDb));
+    const dash = 6.0, gap = 4.0;
+    for (var x = axes.plot.left; x < axes.plot.right; x += dash + gap) {
+      canvas.drawLine(
+        Offset(x, y),
+        Offset(math.min(x + dash, axes.plot.right), y),
+        _reference,
+      );
+    }
+    _paintLabel(
+      canvas,
+      _referenceLabel,
+      Offset(axes.plot.right - 4, y - 3),
+      Alignment.bottomRight,
+    );
+  }
+
   @override
   bool shouldRepaint(covariant _TracePainter old) => true;
+}
+
+/// Graph gain (band dB scale) at which the output equals the bypassed level.
+double flatReferenceGain(double preampDb) => -preampDb;
+
+/// Header switch for the flat reference line.
+class _FlatToggle extends StatelessWidget {
+  final Settings settings;
+  const _FlatToggle(this.settings);
+
+  @override
+  Widget build(BuildContext context) => ListenableBuilder(
+    listenable: settings,
+    builder: (context, _) {
+      final on = settings.showFlatReference;
+      return Tooltip(
+        message: on
+            ? 'Hide the flat reference (EQ off, shifted by the preamp)'
+            : 'Show the flat reference (EQ off, shifted by the preamp)',
+        child: TextButton.icon(
+          style: TextButton.styleFrom(
+            foregroundColor: on ? Palette.ink : Palette.muted,
+            padding: const EdgeInsets.symmetric(horizontal: 6),
+            minimumSize: Size.zero,
+            tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+            textStyle: const TextStyle(
+              fontSize: 10,
+              fontWeight: FontWeight.bold,
+              letterSpacing: 0.8,
+            ),
+          ),
+          icon: Icon(
+            on ? Icons.check_box_outlined : Icons.check_box_outline_blank,
+            size: 14,
+          ),
+          label: const Text('FLAT'),
+          onPressed: () => settings.update(showFlatReference: !on),
+        ),
+      );
+    },
+  );
 }

@@ -74,7 +74,7 @@ jobs:
 
   # Publish the web app to the main site once the release is out.
   web:
-    needs: release
+    needs: [version, release]
     runs-on: ubuntu-latest
     # Serialize with preview.yml: both rewrite gh-pages.
     concurrency:
@@ -87,7 +87,12 @@ jobs:
           channel: stable
           cache: true
       - run: flutter pub get
-      - run: flutter build web --release --base-href "/${{ github.event.repository.name }}/"
+      # CanvasKit from the site itself (not Google's CDN), so the installed
+      # web app works offline.
+      - run: >
+          flutter build web --release --no-web-resources-cdn
+          --base-href "/${{ github.event.repository.name }}/"
+          --dart-define=APP_VERSION=${{ needs.version.outputs.tag }}
       - name: Publish to gh-pages (site root, keeps preview/)
         env:
           GH_TOKEN: ${{ github.token }}

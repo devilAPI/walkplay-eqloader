@@ -43,6 +43,7 @@ jobs:
       - run: >
           flutter build apk --release
           --build-number=${{ inputs.build-number }}
+          --dart-define=APP_VERSION=${{ inputs.name }}
           ${{ inputs.build-name && format('--build-name={0}', inputs.build-name) || '' }}
       - run: cp build/app/outputs/flutter-apk/app-release.apk eqloader-${{ inputs.name }}-android.apk
       - uses: actions/upload-artifact@v4
@@ -89,6 +90,7 @@ jobs:
         run: >
           flutter build ${{ matrix.os }} --release
           --build-number=${{ inputs.build-number }}
+          --dart-define=APP_VERSION=${{ inputs.name }}
           ${{ inputs.build-name && format('--build-name={0}', inputs.build-name) || '' }}
 
       - name: Package (Linux)

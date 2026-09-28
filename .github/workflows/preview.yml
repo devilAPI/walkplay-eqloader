@@ -24,7 +24,12 @@ jobs:
           channel: stable
           cache: true
       - run: flutter pub get
-      - run: flutter build web --release --base-href "/${{ github.event.repository.name }}/preview/"
+      # CanvasKit from the site itself (not Google's CDN), so the installed
+      # web app works offline.
+      - run: >
+          flutter build web --release --no-web-resources-cdn
+          --base-href "/${{ github.event.repository.name }}/preview/"
+          --dart-define=APP_VERSION=preview-${GITHUB_SHA::7}
       - name: Publish to gh-pages (preview/)
         env:
           GH_TOKEN: ${{ github.token }}

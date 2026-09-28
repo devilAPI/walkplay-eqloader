@@ -1,22 +1,11 @@
 import 'package:flutter/material.dart';
 
-import 'ui/home_page.dart';
-import 'ui/theme.dart';
+import 'app/app.dart';
+import 'state/store.dart';
 
-void main() {
-  runApp(const EqLoaderApp());
-}
+export 'app/app.dart';
 
-class EqLoaderApp extends StatelessWidget {
-  const EqLoaderApp({super.key});
-
-  @override
-  Widget build(BuildContext context) {
-    return MaterialApp(
-      title: 'Walkplay PEQ Loader',
-      debugShowCheckedModeBanner: false,
-      theme: buildTheme(),
-      home: const HomePage(),
-    );
-  }
+Future<void> main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  runApp(EqLoaderApp(store: await PrefsStore.open()));
 }

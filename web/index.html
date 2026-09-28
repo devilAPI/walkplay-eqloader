@@ -172,6 +172,24 @@
       var isAndroid = /Android/i.test(ua);
       var hasWebHid = 'hid' in navigator;
 
+      // Installable web app: sw.js serves the last visit when offline.
+      if ('serviceWorker' in navigator) {
+        navigator.serviceWorker.register('sw.js').catch(function (e) {
+          console.warn('Service worker registration failed:', e);
+        });
+      }
+      // Keep the browser's install prompt for Settings → Install as an app
+      // (lib/platform/pwa_web.dart). Without preventDefault, some browsers
+      // show their own install banner right away.
+      window.eqloaderInstallPrompt = null;
+      window.addEventListener('beforeinstallprompt', function (e) {
+        e.preventDefault();
+        window.eqloaderInstallPrompt = e;
+      });
+      window.addEventListener('appinstalled', function () {
+        window.eqloaderInstallPrompt = null;
+      });
+
       var splash = document.getElementById('splash');
       var loading = document.getElementById('loading');
       var notice = document.getElementById('notice');

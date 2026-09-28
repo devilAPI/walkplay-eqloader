@@ -2,29 +2,14 @@ import 'package:flutter/foundation.dart' show compute;
 import 'package:flutter/material.dart';
 import 'package:path/path.dart' as p;
 
-import '../core/autoeq.dart';
-import '../core/autoeq_db.dart';
-import '../core/band.dart';
-import '../core/profile.dart';
-import '../state/eq_model.dart';
-import 'dialogs.dart';
-import 'files.dart';
-import 'theme.dart';
-
-/// What the AutoEQ workflow needs from the main page.
-abstract interface class TaskHost {
-  BuildContext get context;
-  EqModel get model;
-  int get maxFilters;
-
-  /// Run [work]; returns its result, or null after a failure (which is
-  /// logged, and shown as [error] (title, message) if given).
-  Future<T?> runTask<T>(
-    Future<T> Function() work, {
-    (String, String)? busy,
-    (String, String)? error,
-  });
-}
+import '../../core/autoeq.dart';
+import '../../core/autoeq_db.dart';
+import '../../core/band.dart';
+import '../../core/profile.dart';
+import '../dialogs.dart';
+import '../../platform/files.dart';
+import '../task_host.dart';
+import '../theme.dart';
 
 const _curveExtensions = ['txt', 'csv'];
 
@@ -135,7 +120,7 @@ class AutoEqWorkflow {
   // ---- compute ---------------------------------------------------------
 
   Future<void> _run(List<Point> measurement, List<Point>? target) async {
-    final maxFilters = host.maxFilters;
+    final maxFilters = host.settings.maxFilters;
     final result = await host.runTask(
       () async {
         _log('Running AutoEQ optimization, this may take a while...');

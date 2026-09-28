@@ -39,6 +39,8 @@ dependencies:
   file_picker: ^13.1.0
   ffi: ^2.2.0
   web: ^1.1.1
+  shared_preferences: ^2.5.5
+  url_launcher: ^6.3.2
 
 dev_dependencies:
   flutter_test:

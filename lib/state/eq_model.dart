@@ -44,6 +44,9 @@ class EqModel extends ChangeNotifier {
   Set<int> selection = {0};
   String preamp = '0';
 
+  /// [preamp] as typed, or 0 while it isn't a number.
+  double get preampDb => parseDoubleText(preamp, 0)!;
+
   /// Bumped whenever the editor fields must reload from the primary band.
   int fieldsRevision = 0;
 
@@ -152,10 +155,18 @@ class EqModel extends ChangeNotifier {
     notifyListeners();
   }
 
-  /// Replace the whole EQ (one undo step): from a file, the device or AutoEQ.
-  void setFilters(List<Band> newFilters, double newPreamp) {
+  /// Replace the whole EQ (one undo step). [clean]: drop OFF bands and
+  /// duplicates, for EQs from a file, the device or AutoEQ; library
+  /// profiles come back exactly as they were saved.
+  void setFilters(
+    List<Band> newFilters,
+    double newPreamp, {
+    bool clean = true,
+  }) {
     _record();
-    filters = activeFilters(newFilters);
+    filters = clean
+        ? activeFilters(newFilters)
+        : [for (final f in newFilters) f.copy()];
     preamp = fmtG(newPreamp);
     _selectOnly(0);
     notifyListeners();

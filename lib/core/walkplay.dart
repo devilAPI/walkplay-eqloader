@@ -161,7 +161,10 @@ class WalkplayDevice {
     );
   }
 
-  Future<int> getCurrentSlot() async {
+  Future<int> getCurrentSlot() async => (await getInfo()).slot;
+
+  /// Firmware version and the active EQ slot (-1 when not reported).
+  Future<({String version, int slot})> getInfo() async {
     await sendReport([_read, cmdVersion, _end]);
     var resp = await waitForResponse(cmdVersion);
     final version = String.fromCharCodes(
@@ -173,7 +176,7 @@ class WalkplayDevice {
     resp = await waitForResponse(cmdPeqValues);
     final slot = resp.length > 35 ? resp[35] : -1;
     log('Current EQ slot: $slot');
-    return slot;
+    return (version: version, slot: slot);
   }
 
   Future<void> writeGlobalGain(int valueDb) =>
