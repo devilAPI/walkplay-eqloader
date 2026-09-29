@@ -137,7 +137,7 @@ jobs:
             "${LIBS_ARGS[@]}" \
             --output appimage
 
-          mv eqloader-*.AppImage "$NAME.AppImage"
+          mv *.AppImage "$NAME.AppImage"
       - name: Package (Windows)
         if: matrix.os == 'windows'
         shell: pwsh
