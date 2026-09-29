@@ -83,7 +83,7 @@ jobs:
       - if: matrix.os == 'linux'
         run: |
           sudo apt-get update
-          sudo apt-get install -y clang cmake ninja-build pkg-config libgtk-3-dev liblzma-dev
+          sudo apt-get install -y clang cmake ninja-build pkg-config libgtk-3-dev liblzma-dev patchelf
 
       - run: flutter pub get
       - shell: bash
@@ -96,6 +96,48 @@ jobs:
       - name: Package (Linux)
         if: matrix.os == 'linux'
         run: tar -czf "$NAME.tar.gz" -C build/linux/${{ matrix.arch }}/release/bundle .
+      - name: AppImage (Linux)
+        if: matrix.os == 'linux'
+        run: |
+          case "${{ matrix.arch }}" in
+            x64)   TOOL_ARCH=x86_64  ;;
+            arm64) TOOL_ARCH=aarch64 ;;
+          esac
+          curl -fsSLo linuxdeploy \
+            "https://github.com/linuxdeploy/linuxdeploy/releases/download/continuous/linuxdeploy-${TOOL_ARCH}.AppImage"
+          curl -fsSLo linuxdeploy-plugin-appimage \
+            "https://github.com/linuxdeploy/linuxdeploy-plugin-appimage/releases/download/continuous/linuxdeploy-plugin-appimage-${TOOL_ARCH}.AppImage"
+          chmod +x linuxdeploy linuxdeploy-plugin-appimage
+          # CI runners have no FUSE; extract-and-run avoids mounting the AppImage.
+          export APPIMAGE_EXTRACT_AND_RUN=1
+
+          BUNDLE="build/linux/${{ matrix.arch }}/release/bundle"
+          mkdir -p AppDir/usr/bin \
+                   AppDir/usr/share/icons/hicolor/512x512/apps \
+                   AppDir/usr/share/applications
+
+          cp "$BUNDLE/eqloader"   AppDir/usr/bin/
+          cp -r "$BUNDLE/lib"     AppDir/usr/bin/lib
+          cp -r "$BUNDLE/data"    AppDir/usr/bin/data
+
+          cp web/icons/Icon-512.png \
+             AppDir/usr/share/icons/hicolor/512x512/apps/eqloader.png
+          printf '[Desktop Entry]\nName=EQ Loader\nExec=eqloader\nIcon=eqloader\nType=Application\nCategories=AudioVideo;Audio;\n' \
+            > AppDir/usr/share/applications/eqloader.desktop
+
+          # Pass each bundled Flutter .so so linuxdeploy resolves their system deps.
+          LIBS_ARGS=()
+          while IFS= read -r lib; do
+            LIBS_ARGS+=(--library "$lib")
+          done < <(find AppDir/usr/bin/lib -name '*.so')
+
+          ./linuxdeploy \
+            --appdir AppDir \
+            --executable AppDir/usr/bin/eqloader \
+            "${LIBS_ARGS[@]}" \
+            --plugin appimage
+
+          mv eqloader-*.AppImage "$NAME.AppImage"
       - name: Package (Windows)
         if: matrix.os == 'windows'
         shell: pwsh
@@ -132,3 +174,4 @@ jobs:
             eqloader-*.tar.gz
             eqloader-*.zip
             eqloader-*-setup.exe
+            eqloader-*.AppImage
