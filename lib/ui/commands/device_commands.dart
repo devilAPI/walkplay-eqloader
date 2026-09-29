@@ -158,7 +158,8 @@ class DeviceCommands {
     }
 
     final saved = library.matching(preamp, model.filters);
-    final filters = padForPush(model.filters, max);
+    final trimmed = model.filters.length > max ? model.filters.sublist(0, max) : model.filters;
+    final filters = padForPush(trimmed, max);
     final ok = await host.runTask(
       () => device.withDevice((dev, info) async {
         await dev.push(slot, preamp, filters, bufferDb: buffer);
