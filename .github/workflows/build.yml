@@ -135,7 +135,7 @@ jobs:
             --appdir AppDir \
             --executable AppDir/usr/bin/eqloader \
             "${LIBS_ARGS[@]}" \
-            --plugin appimage
+            --output appimage
 
           mv eqloader-*.AppImage "$NAME.AppImage"
       - name: Package (Windows)
