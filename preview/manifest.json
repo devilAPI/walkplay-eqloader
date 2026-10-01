@@ -1,0 +1,36 @@
+{
+    "name": "Walkplay PEQ Loader",
+    "short_name": "PEQ Loader",
+    "start_url": ".",
+    "scope": ".",
+    "display": "standalone",
+    "background_color": "#14161A",
+    "theme_color": "#14161A",
+    "description": "Edit parametric EQ and push it to Walkplay-based USB DAC dongles from the browser.",
+    "categories": ["music", "utilities"],
+    "prefer_related_applications": false,
+    "icons": [
+        {
+            "src": "icons/Icon-192.png",
+            "sizes": "192x192",
+            "type": "image/png"
+        },
+        {
+            "src": "icons/Icon-512.png",
+            "sizes": "512x512",
+            "type": "image/png"
+        },
+        {
+            "src": "icons/Icon-maskable-192.png",
+            "sizes": "192x192",
+            "type": "image/png",
+            "purpose": "maskable"
+        },
+        {
+            "src": "icons/Icon-maskable-512.png",
+            "sizes": "512x512",
+            "type": "image/png",
+            "purpose": "maskable"
+        }
+    ]
+}
