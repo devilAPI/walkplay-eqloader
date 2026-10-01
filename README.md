@@ -13,7 +13,7 @@ Or get the latest build from [Releases](../../releases):
 | Platform | File | Status |
 |---|---|---|
 | Android | `…-android.apk` | Tested |
-| Linux x64 / arm64 | `…-linux-x64.tar.gz` | Tested |
+| Linux x64 | `…-linux-x64.tar.gz` | Tested |
 | Linux arm64 | `…-linux-arm64.tar.gz` | **Untested** |
 | Windows x64 | `…-windows-x64-setup.exe` (installer), `…-windows-x64.zip` (portable) | Tested |
 | Windows arm64 | `…-windows-arm64-setup.exe` (installer), `…-windows-arm64.zip` (portable) | **Untested** |
